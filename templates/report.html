@@ -1,0 +1,76 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Report Trash - Smart Trash Monitoring</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="icon" href="{{ url_for('static', filename='favicon.ico') }}">
+</head>
+<body class="bg-light">
+    <nav class="navbar navbar-dark bg-primary">
+        <div class="container">
+            <a href="../public/index.html" class="navbar-brand">Smart Trash Monitoring</a>
+            <button class="btn btn-danger" onclick="logout()">Logout</button>
+        </div>
+    </nav>
+
+    <div class="container mt-4">
+        <h2 class="text-center">Report a Trash Location</h2>
+        <form id="reportForm" class="mt-4">
+            <!-- Select Block -->
+            <div class="mb-3">
+                <label class="form-label">Select Block:</label>
+                <select id="blockSelect" class="form-select" required>
+                    <option value="" disabled selected>Select a Block</option>
+                    <option value="M Block">M Block</option>
+                    <option value="E Block">E Block</option>
+                </select>
+            </div>
+
+            <!-- Select Floor -->
+            <div class="mb-3">
+                <label class="form-label">Select Floor:</label>
+                <select id="floorSelect" class="form-select" disabled required>
+                    <option value="" disabled selected>Select a Floor</option>
+                    <!-- Floors will be populated dynamically -->
+                </select>
+            </div>
+
+            <!-- Select Area -->
+            <div class="mb-3">
+                <label class="form-label">Select Area:</label>
+                <select id="areaSelect" class="form-select" disabled required>
+                    <option value="" disabled selected>Select an Area</option>
+                    <!-- Areas will be populated dynamically -->
+                </select>
+            </div>
+
+            <!-- Additional Details -->
+            <div class="mb-3">
+                <label class="form-label">Additional Details (Optional):</label>
+                <input type="text" id="additionalDetails" class="form-control" placeholder="e.g., Near washroom zone">
+            </div>
+
+            <!-- Photo Upload -->
+            <div class="mb-3">
+                <label class="form-label">Upload Photo:</label>
+                <input type="file" id="trashPhoto" class="form-control" accept="image/*" capture="environment" required>
+                <small class="text-muted">For best results, use your camera to take a new photo</small>
+            </div>
+
+            <button type="submit" class="btn btn-success w-100" id="submitBtn">Submit Report</button>
+        </form>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/exif-js/2.3.0/exif.min.js"></script>
+    <script type="module" src="../static/js/report.js"></script>
+    <script>
+        // Basic logout function (customize as needed)
+        function logout() {
+            window.location.href = "/logout"; // Adjust this URL to your logout endpoint
+        }
+    </script>
+</body>
+</html>
