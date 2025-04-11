@@ -274,39 +274,39 @@ document.addEventListener("DOMContentLoaded", () => {
 });
 
 // Extract GPS from image using EXIF.js
-function extractGPS(file) {
-    return new Promise((resolve, reject) => {
-        const reader = new FileReader();
+// function extractGPS(file) {
+//     return new Promise((resolve, reject) => {
+//         const reader = new FileReader();
 
-        reader.onload = function (event) {
-            const img = new Image();
-            img.src = event.target.result;
+//         reader.onload = function (event) {
+//             const img = new Image();
+//             img.src = event.target.result;
 
-            img.onload = function () {
-                try {
-                    EXIF.getData(img, function () {
-                        const lat = EXIF.getTag(this, "GPSLatitude");
-                        const lon = EXIF.getTag(this, "GPSLongitude");
-                        const latRef = EXIF.getTag(this, "GPSLatitudeRef") || "N";
-                        const lonRef = EXIF.getTag(this, "GPSLongitudeRef") || "E";
+//             img.onload = function () {
+//                 try {
+//                     EXIF.getData(img, function () {
+//                         const lat = EXIF.getTag(this, "GPSLatitude");
+//                         const lon = EXIF.getTag(this, "GPSLongitude");
+//                         const latRef = EXIF.getTag(this, "GPSLatitudeRef") || "N";
+//                         const lonRef = EXIF.getTag(this, "GPSLongitudeRef") || "E";
 
-                        if (lat && lon) {
-                            const latitude = (lat[0] + lat[1] / 60 + lat[2] / 3600) * (latRef === "N" ? 1 : -1);
-                            const longitude = (lon[0] + lon[1] / 60 + lon[2] / 3600) * (lonRef === "E" ? 1 : -1);
-                            resolve({ latitude, longitude });
-                        } else {
-                            reject("No GPS data found.");
-                        }
-                    });
-                } catch (error) {
-                    reject("Error extracting GPS data.");
-                }
-            };
+//                         if (lat && lon) {
+//                             const latitude = (lat[0] + lat[1] / 60 + lat[2] / 3600) * (latRef === "N" ? 1 : -1);
+//                             const longitude = (lon[0] + lon[1] / 60 + lon[2] / 3600) * (lonRef === "E" ? 1 : -1);
+//                             resolve({ latitude, longitude });
+//                         } else {
+//                             reject("No GPS data found.");
+//                         }
+//                     });
+//                 } catch (error) {
+//                     reject("Error extracting GPS data.");
+//                 }
+//             };
 
-            img.onerror = () => reject("Image load error");
-        };
+//             img.onerror = () => reject("Image load error");
+//         };
 
-        reader.onerror = () => reject("FileReader error");
-        reader.readAsDataURL(file);
-    });
-}
+//         reader.onerror = () => reject("FileReader error");
+//         reader.readAsDataURL(file);
+//     });
+// }
