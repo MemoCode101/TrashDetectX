@@ -1,32 +1,22 @@
-from flask import Flask, render_template, request, jsonify
-from flask_sqlalchemy import SQLAlchemy
+from flask import Flask, render_template, request, jsonify, send_from_directory
 from flask_cors import CORS
 from werkzeug.utils import secure_filename
 import os
+import firebase_admin
+from firebase_admin import credentials, firestore
+from Detect import detect_trash_yolo
 
 app = Flask(__name__)
-CORS(app)
+CORS(app, resources={r"/static/*": {"origins": "http://127.0.0.1:3000"}})
 
-# Configurations
-app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///trash_reports.db'
+# Firebase configuration
+cred = credentials.Certificate("firebase_config.json")  # Your Firebase service account key JSON file
+firebase_admin.initialize_app(cred)
+db = firestore.client()
+
+# Upload folder configuration
 app.config['UPLOAD_FOLDER'] = 'static/uploads'
 app.config['MAX_CONTENT_LENGTH'] = 16 * 1024 * 1024  # 16MB max upload size
-app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
-
-# Initialize DB
-db = SQLAlchemy(app)
-
-# Model
-class TrashReport(db.Model):
-    id = db.Column(db.Integer, primary_key=True)
-    block = db.Column(db.String(50), nullable=False)
-    floor = db.Column(db.String(50), nullable=False)
-    area = db.Column(db.String(50), nullable=False)
-    details = db.Column(db.String(200))
-    image_path = db.Column(db.String(200))
-    status = db.Column(db.String(20), default='Pending')
-    latitude = db.Column(db.Float)
-    longitude = db.Column(db.Float)
 
 # Routes
 @app.route('/')
@@ -42,53 +32,85 @@ def upload_image():
         os.makedirs(app.config['UPLOAD_FOLDER'], exist_ok=True)
         file.save(filepath)
 
-        # 🧠 Dummy detection for now
-        detections = ['plastic', 'paper']  # Just for simulation
-        return jsonify({'success': True, 'filename': filename, 'detections': detections})
+        try:
+            detections, saved_image_path = detect_trash_yolo(filepath)
+            print("Detections:", detections)
+
+            if detections:
+                return jsonify({
+                    'success': True,
+                    'filename': filename,
+                    'detections': detections,
+                    'detected_image_path': saved_image_path
+                })
+            else:
+                return jsonify({'success': False, 'error': 'No trash detected'})
+        except Exception as e:
+            return jsonify({'success': False, 'error': str(e)})
 
     return jsonify({'success': False, 'error': 'No file uploaded'}), 400
 
 @app.route('/submit-report', methods=['POST'])
 def submit_report():
     data = request.get_json()
-
     try:
-        new_report = TrashReport(
-            block=data['block'],
-            floor=data['floor'],
-            area=data['area'],
-            details=data.get('details', ''),
-            latitude=data['gps'].get('latitude'),
-            longitude=data['gps'].get('longitude')
-        )
-        db.session.add(new_report)
-        db.session.commit()
-
+        new_report = {
+            'block': data['block'],
+            'floor': data['floor'],
+            'area': data['area'],
+            'details': data.get('details', ''),
+            'status': 'Pending',
+            'latitude': data['gps'].get('latitude'),
+            'longitude': data['gps'].get('longitude'),
+            'filename': data.get('filename', ''),
+            'detected_image': data.get('detected_image_path', '')
+        }
+        db.collection('trash_reports').add(new_report)
         return jsonify({'success': True, 'message': 'Report submitted successfully'})
     except Exception as e:
         return jsonify({'success': False, 'error': str(e)}), 500
 
 @app.route('/admin/reports')
 def view_reports():
-    reports = TrashReport.query.order_by(TrashReport.id.desc()).all()
-    return render_template('admin_dashboard.html', reports=reports)
+    try:
+        reports_ref = db.collection('trash_reports').order_by("block")
+        docs = reports_ref.stream()
+        reports = []
+        for doc in docs:
+            report = doc.to_dict()
+            report['id'] = doc.id
+            reports.append(report)
+        return render_template('dashboard.html', reports=reports)
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)}), 500
 
-@app.route('/update-status/<int:report_id>', methods=['POST'])
+@app.route('/update-status/<string:report_id>', methods=['POST'])
 def update_status(report_id):
     data = request.get_json()
-    report = TrashReport.query.get_or_404(report_id)
-    report.status = data.get('status', 'Pending')
-    db.session.commit()
-    return jsonify({'success': True, 'message': 'Status updated'})
+    try:
+        db.collection('trash_reports').document(report_id).update({'status': data.get('status', 'Pending')})
+        return jsonify({'success': True, 'message': 'Status updated'})
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)}), 500
 
-@app.route('/delete-report/<int:report_id>', methods=['DELETE'])
+@app.route('/delete-report/<string:report_id>', methods=['DELETE'])
 def delete_report(report_id):
-    report = TrashReport.query.get_or_404(report_id)
-    db.session.delete(report)
-    db.session.commit()
-    return jsonify({'success': True, 'message': 'Report deleted'})
+    try:
+        db.collection('trash_reports').document(report_id).delete()
+        return jsonify({'success': True, 'message': 'Report deleted'})
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+@app.route('/admin/dashboard')
+def admin_dashboard():
+    return render_template('dashboard.html')
+
+@app.route('/detected/<path:filename>')
+def serve_detected_images(filename):
+    return send_from_directory('static/detected', filename)
 
 if __name__ == '__main__':
-    with app.app_context():
-        db.create_all()  # Create DB tables if not present
+    app.run(debug=True, port=5000)
+
+if __name__ == '__main__':
     app.run(debug=True)

@@ -1,63 +1,58 @@
-document.addEventListener("DOMContentLoaded", async () => {
-    if (!firebase.apps.length) {
-        console.error("Firebase is not initialized. Check firebase-config.js.");
-        return;
-    }
+// dashboard.js
 
-    const db = firebase.firestore();
-    const tableBody = document.getElementById("reportTableBody");
+const db = firebase.firestore();
+const reportTableBody = document.getElementById('reportTableBody');
 
-    // ✅ Single Clean fetchReports()
-    async function fetchReports() {
-        tableBody.innerHTML = "";
-
-        try {
-            const querySnapshot = await db.collection("reports").orderBy("timestamp", "desc").get();
-
+function fetchReports() {
+    const flaskServerUrl = 'http://127.0.0.1:5000'; // Flask server URL
+    db.collection("trash_reports").orderBy("block").get()
+        .then((querySnapshot) => {
+            reportTableBody.innerHTML = ''; // Clear existing rows
             querySnapshot.forEach((doc) => {
-                const report = doc.data();
-                console.log("Fetched report:", report);
-                const row = document.createElement("tr");
+                const data = doc.data();
+                const row = document.createElement('tr');
+
+                // Normalize the detected_image path (replace backslashes and ensure correct format)
+                let detectedImage = (data.detected_image || '').replace(/\\/g, '/');
+                const detectedImagePath = detectedImage ? `${flaskServerUrl}/${detectedImage}` : '';
+                console.log("Image path being used:", detectedImagePath); // Debug log
 
                 row.innerHTML = `
-                    <td>${report.block || "N/A"}</td>
-                    <td>${report.floor || "N/A"}</td>
-                    <td>${report.area || "N/A"}</td>
-                    <td>${report.additionalDetails || "None"}</td>
-                    <td>${report.status || "Pending"}</td>
+                    <td>${data.block || ''}</td>
+                    <td>${data.floor || ''}</td>
+                    <td>${data.area || ''}</td>
+                    <td>${data.details || ''}</td>
+                    <td>${data.status || 'Pending'}</td>
                     <td>
-                        ${report.imageUrl ? `<img src="${report.imageUrl}" width="100" class="mb-2"><br>` : ''}
-                        ${report.latitude && report.longitude 
-                            ? `<small>Lat: ${report.latitude}<br>Lon: ${report.longitude}</small><br>` 
-                            : ''}
-                        <button class="btn btn-success btn-sm mt-2" onclick="updateStatus('${doc.id}', 'Cleaned')">Mark Cleaned</button>
-                        <button class="btn btn-danger btn-sm mt-1" onclick="deleteReport('${doc.id}')">Delete</button>
+                        ${data.latitude && data.longitude ? 
+                            `<a href="https://www.google.com/maps?q=${data.latitude},${data.longitude}" target="_blank">View Location</a>` 
+                            : 'No location'}
+                        <br>
+                        ${detectedImagePath ? `<img src="${detectedImagePath}" alt="Detected Trash" style="max-width: 200px; max-height: 200px;" onerror="this.style.display='none';console.log('Image load failed for ${detectedImagePath}');">` : 'No image'}
+                    </td>
+                    <td>
+                        <button class="btn btn-sm btn-success" onclick="updateStatus('${doc.id}', 'Resolved')">Resolve</button>
+                        <button class="btn btn-sm btn-danger" onclick="deleteReport('${doc.id}')">Delete</button>
                     </td>
                 `;
-
-                tableBody.appendChild(row);
+                reportTableBody.appendChild(row);
             });
-        } catch (error) {
+        })
+        .catch((error) => {
             console.error("Error fetching reports:", error);
-        }
-    }
+        });
+}
+function updateStatus(id, newStatus) {
+    db.collection("trash_reports").doc(id).update({ status: newStatus })
+        .then(() => fetchReports())
+        .catch((error) => console.error("Error updating status:", error));
+}
 
-    // ✅ Update Status
-    window.updateStatus = async (reportId, newStatus) => {
-        await db.collection("reports").doc(reportId).update({ status: newStatus });
-        alert("Status updated!");
-        fetchReports();
-    };
+function deleteReport(id) {
+    db.collection("trash_reports").doc(id).delete()
+        .then(() => fetchReports())
+        .catch((error) => console.error("Error deleting report:", error));
+}
 
-    // ✅ Delete Report
-    window.deleteReport = async (reportId) => {
-        if (confirm("Are you sure you want to delete this report?")) {
-            await db.collection("reports").doc(reportId).delete();
-            alert("Report deleted!");
-            fetchReports();
-        }
-    };
-
-    // ✅ Load on Page
-    fetchReports();
-});
+// Fetch all reports on load
+fetchReports();
