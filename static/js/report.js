@@ -13,7 +13,7 @@ document.addEventListener("DOMContentLoaded", () => {
         if (!block || !floor) return [];
         const areas = [];
         for (let i = 1; i <= 6; i++) {
-            areas.push(`${block.charAt(0)}${floor[0]}0${i}`); // M101, E202 etc.
+            areas.push(`${block.charAt(0)}${floor[0]}0${i}`);
         }
         areas.push("Toilet Area");
         return areas;
@@ -51,6 +51,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
     document.getElementById("reportForm").addEventListener("submit", async (e) => {
         e.preventDefault();
+        console.log("Form submitted"); // Debug log to check for duplicate submissions
 
         const block = blockSelect.value;
         const floor = floorSelect.value;
@@ -61,7 +62,8 @@ document.addEventListener("DOMContentLoaded", () => {
         let latitude = null;
         let longitude = null;
         let filename = '';
-        let detectedImagePath = '';
+        let detectedImagePath = ''; // Ensure variable is defined
+        let detections = [];
 
         try {
             if (file) {
@@ -84,11 +86,12 @@ document.addEventListener("DOMContentLoaded", () => {
                 });
 
                 const uploadData = await uploadResponse.json();
-                console.log("Detection result:", uploadData.detections);
+                console.log("Upload response:", uploadData); // Debug log
                 if (!uploadData.success) throw new Error(uploadData.error);
 
                 filename = uploadData.filename;
-                detectedImagePath = uploadData.detected_image_path || '';
+                detectedImagePath = uploadData.detected_image_path || ''; // Correct assignment
+                detections = uploadData.detections || [];
             }
 
             const reportResponse = await fetch("/submit-report", {
@@ -101,21 +104,37 @@ document.addEventListener("DOMContentLoaded", () => {
                     floor,
                     area,
                     details: additionalDetails,
-                    gps: {
-                        latitude,
-                        longitude
-                    },
-                    filename: filename,  // Use the defined variable
-                    detected_image_path: detectedImagePath  // Use the defined variable
+                    gps: { latitude, longitude },
+                    filename: filename,
+                    detected_image_path: detectedImagePath, // Use the correct key
+                    detections: detections // Ensure detections are sent
                 })
             });
+            console.log("Submitting data:", {
+                block,
+                floor,
+                area,
+                details: additionalDetails,
+                gps: { latitude, longitude },
+                filename,
+                detected_image_path: detectedImagePath, // Use the correct key
+                detections
+            }); // Debug log
 
             const reportData = await reportResponse.json();
             alert("Report submitted successfully!");
             console.log("Server response:", reportData);
 
+            // Reset form after successful submission
+            document.getElementById("reportForm").reset();
+            blockSelect.selectedIndex = 0;
+            floorSelect.innerHTML = '<option value="" disabled selected>Select a Floor</option>';
+            floorSelect.disabled = true;
+            areaSelect.innerHTML = '<option value="" disabled selected>Select an Area</option>';
+            areaSelect.disabled = true;
         } catch (error) {
             console.error("Error submitting report:", error);
+            alert("Error submitting report: " + error.message);
         }
     });
 });
@@ -123,11 +142,9 @@ document.addEventListener("DOMContentLoaded", () => {
 function extractGPS(file) {
     return new Promise((resolve, reject) => {
         const reader = new FileReader();
-
         reader.onload = function (event) {
             const img = new Image();
             img.src = event.target.result;
-
             img.onload = function () {
                 try {
                     EXIF.getData(img, function () {
@@ -135,7 +152,6 @@ function extractGPS(file) {
                         const lon = EXIF.getTag(this, "GPSLongitude");
                         const latRef = EXIF.getTag(this, "GPSLatitudeRef") || "N";
                         const lonRef = EXIF.getTag(this, "GPSLongitudeRef") || "E";
-
                         if (lat && lon) {
                             const latitude = (lat[0] + lat[1] / 60 + lat[2] / 3600) * (latRef === "N" ? 1 : -1);
                             const longitude = (lon[0] + lon[1] / 60 + lon[2] / 3600) * (lonRef === "E" ? 1 : -1);
@@ -148,10 +164,8 @@ function extractGPS(file) {
                     reject("Error extracting GPS data.");
                 }
             };
-
             img.onerror = () => reject("Image load error");
         };
-
         reader.onerror = () => reject("FileReader error");
         reader.readAsDataURL(file);
     });

@@ -4,15 +4,23 @@ from werkzeug.utils import secure_filename
 import os
 import firebase_admin
 from firebase_admin import credentials, firestore
+from google.api_core import retry
 from Detect import detect_trash_yolo
 
 app = Flask(__name__)
 CORS(app, resources={r"/static/*": {"origins": "http://127.0.0.1:3000"}})
 
 # Firebase configuration
-cred = credentials.Certificate("firebase_config.json")  # Your Firebase service account key JSON file
-firebase_admin.initialize_app(cred)
-db = firestore.client()
+try:
+    cred = credentials.Certificate("firebase_config.json")
+    firebase_admin.initialize_app(cred, {
+        'projectId': 'trash-detector-58bb6'  # Replace with your actual project ID
+    })
+    db = firestore.client()
+    print("✅ Firebase initialized successfully")
+except Exception as e:
+    print(f"❌ Firebase initialization failed: {str(e)}")
+    raise
 
 # Upload folder configuration
 app.config['UPLOAD_FOLDER'] = 'static/uploads'
@@ -52,22 +60,32 @@ def upload_image():
 
 @app.route('/submit-report', methods=['POST'])
 def submit_report():
-    data = request.get_json()
     try:
+        data = request.get_json()
+        if not data:
+            return jsonify({'success': False, 'error': 'No JSON data provided'}), 400
+
         new_report = {
-            'block': data['block'],
-            'floor': data['floor'],
-            'area': data['area'],
+            'block': data.get('block', ''),
+            'floor': data.get('floor', ''),
+            'area': data.get('area', ''),
             'details': data.get('details', ''),
             'status': 'Pending',
-            'latitude': data['gps'].get('latitude'),
-            'longitude': data['gps'].get('longitude'),
+            'latitude': data.get('gps', {}).get('latitude'),
+            'longitude': data.get('gps', {}).get('longitude'),
             'filename': data.get('filename', ''),
-            'detected_image': data.get('detected_image_path', '')
+            'detected_image': data.get('detected_image_path', ''),
+            'detections': data.get('detections', [])  # Ensure detections are saved
         }
-        db.collection('trash_reports').add(new_report)
+        
+        @retry.Retry(predicate=retry.if_transient_error)
+        def add_report():
+            db.collection('trash_reports').add(new_report)
+
+        add_report()
         return jsonify({'success': True, 'message': 'Report submitted successfully'})
     except Exception as e:
+        print(f"Error in submit_report: {str(e)}")
         return jsonify({'success': False, 'error': str(e)}), 500
 
 @app.route('/admin/reports')
@@ -111,6 +129,3 @@ def serve_detected_images(filename):
 
 if __name__ == '__main__':
     app.run(debug=True, port=5000)
-
-if __name__ == '__main__':
-    app.run(debug=True)
