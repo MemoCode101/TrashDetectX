@@ -1,19 +1,26 @@
-// dashboard.js
-
 const db = firebase.firestore();
 const reportTableBody = document.getElementById('reportTableBody');
+const statusSummary = document.getElementById('statusSummary');
 
 function fetchReports(filterClass = '') {
+    if (!reportTableBody) {
+        console.error("reportTableBody element not found!");
+        return;
+    }
+
+    console.log("Fetching reports from Firestore...");
+
     const flaskServerUrl = 'http://127.0.0.1:5000';
     let pendingCount = 0, resolvedCount = 0;
     db.collection("trash_reports").orderBy("block").get()
         .then((querySnapshot) => {
+            console.log(`Found ${querySnapshot.size} reports`);
             reportTableBody.innerHTML = '';
             querySnapshot.forEach((doc) => {
                 const data = doc.data();
+                console.log("Report data:", data);
                 const detectionsList = Array.isArray(data.detections) && data.detections.length > 0 ? data.detections.join(', ') : 'None';
 
-                // Filter by class if specified
                 if (filterClass && !data.detections.includes(filterClass)) return;
 
                 if (data.status === 'Pending') pendingCount++;
@@ -36,7 +43,7 @@ function fetchReports(filterClass = '') {
                                 : `Lat: ${data.latitude || 'N/A'}, Lon: ${data.longitude || 'N/A'}`)
                             : 'No location'}
                         <br>
-                        ${detectedImagePath ? `<a href="#" onclick="showImageModal('${detectedImagePath}')">View Image</a>` : 'No image'}
+                        ${detectedImagePath ? `<button class="btn btn-link p-0" style="text-decoration: underline; color: blue;" onclick="showImageModal('${detectedImagePath}')">View Image</button>` : 'No image'}
                     </td>
                     <td>${detectionsList}</td>
                     <td>
@@ -47,9 +54,13 @@ function fetchReports(filterClass = '') {
                 reportTableBody.appendChild(row);
             });
 
-            document.getElementById('statusSummary').innerHTML = `
-                <p>Pending: ${pendingCount} | Resolved: ${resolvedCount}</p>
-            `;
+            if (statusSummary) {
+                statusSummary.innerHTML = `
+                    <p>Pending: ${pendingCount} | Resolved: ${resolvedCount}</p>
+                `;
+            } else {
+                console.warn("statusSummary element not found!");
+            }
         })
         .catch((error) => {
             console.error("Error fetching reports:", error);
@@ -69,6 +80,7 @@ function deleteReport(id) {
 }
 
 function showImageModal(imagePath) {
+    console.log("Opening modal with image:", imagePath);
     const modal = document.createElement('div');
     modal.className = 'modal fade';
     modal.id = 'imageModal';
@@ -94,9 +106,7 @@ function showImageModal(imagePath) {
     modal.addEventListener('hidden.bs.modal', () => modal.remove());
 }
 
-
-
-
-
-// Fetch reports on load
-fetchReports();
+document.addEventListener('DOMContentLoaded', () => {
+    console.log("DOM loaded, calling fetchReports...");
+    fetchReports();
+});

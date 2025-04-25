@@ -1,41 +1,78 @@
 const auth = firebase.auth();
 
+// In auth.js (adjust based on your current implementation)
 function login() {
-    const email = document.getElementById("email").value;
-    const password = document.getElementById("password").value;
+    const email = document.getElementById('email').value;
+    const password = document.getElementById('password').value;
+    const errorMessage = document.getElementById('error-message');
 
-    auth.signInWithEmailAndPassword(email, password)
-        .then(() => {
-            window.location.href = "index.html"; 
+    firebase.auth().signInWithEmailAndPassword(email, password)
+        .then((userCredential) => {
+            const user = userCredential.user;
+            return fetch('/auth-callback', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ user: { email: user.email } })
+            }).then(response => response.json()).then(data => {
+                if (data.success) {
+                    window.location.href = data.redirect;
+                } else {
+                    errorMessage.textContent = data.error;
+                }
+            });
         })
-        .catch(error => {
-            document.getElementById("error-message").innerText = error.message;
+        .catch((error) => {
+            errorMessage.textContent = error.message;
         });
 }
 
 function signup() {
-    const email = document.getElementById("email").value;
-    const password = document.getElementById("password").value;
+    const email = document.getElementById('email').value;
+    const password = document.getElementById('password').value;
+    const errorMessage = document.getElementById('error-message');
 
-    auth.createUserWithEmailAndPassword(email, password)
-        .then(() => {
-            window.location.href = "index.html";  
+    firebase.auth().createUserWithEmailAndPassword(email, password)
+        .then((userCredential) => {
+            const user = userCredential.user;
+            return fetch('/auth-callback', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ user: { email: user.email } })
+            }).then(response => response.json()).then(data => {
+                if (data.success) {
+                    window.location.href = data.redirect;
+                } else {
+                    errorMessage.textContent = data.error;
+                }
+            });
         })
-        .catch(error => {
-            document.getElementById("error-message").innerText = error.message;
+        .catch((error) => {
+            errorMessage.textContent = error.message;
         });
 }
 
-// 📌 Google Sign-In
 function googleLogin() {
     const provider = new firebase.auth.GoogleAuthProvider();
-    
+    const errorMessage = document.getElementById('error-message');
+
     firebase.auth().signInWithPopup(provider)
-        .then(result => {
-            alert("Google Sign-In Successful!");
-            window.location.href = "index.html"; 
+        .then((result) => {
+            const user = result.user;
+            return fetch('/auth-callback', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ user: { email: user.email } })
+            }).then(response => response.json()).then(data => {
+                if (data.success) {
+                    window.location.href = data.redirect;
+                } else {
+                    errorMessage.textContent = data.error;
+                }
+            });
         })
-        .catch(error => alert(error.message));
+        .catch((error) => {
+            errorMessage.textContent = error.message;
+        });
 }
 
 
